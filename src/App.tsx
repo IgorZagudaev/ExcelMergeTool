@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import * as XLSX from 'xlsx';
+import { v4 as uuidv4 } from 'uuid';
 import {
   FileSpreadsheet,
   Upload,
@@ -84,7 +85,7 @@ export default function App() {
 
     try {
       const data = await parseExcelFile(file);
-      setTemplate({ id: crypto.randomUUID(), name: file.name, data });
+      setTemplate({ id: uuidv4(), name: file.name, data });
       setKeyColumns([]);
       setTargetColumns([]);
       setResultData(null);
@@ -110,7 +111,7 @@ export default function App() {
     for (const file of files) {
       try {
         const data = await parseExcelFile(file);
-        newReports.push({ id: crypto.randomUUID(), name: file.name, data });
+        newReports.push({ id: uuidv4(), name: file.name, data });
         addLog('success', `Отчёт "${file.name}" загружен. Столбцов: ${data.headers.length}, строк: ${data.rows.length}`);
       } catch (err) {
         addLog('error', `Ошибка загрузки "${file.name}": ${(err as Error).message}`);
