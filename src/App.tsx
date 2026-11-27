@@ -42,6 +42,7 @@ export default function App() {
   const [resultData, setResultData] = useState<SheetData | null>(null);
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   const addLog = useCallback((type: LogEntry['type'], message: string) => {
     setLogs((prev) => [...prev, { type, message, timestamp: new Date() }]);
@@ -155,13 +156,14 @@ export default function App() {
   };
 
   // Process matching
-  const processMatching = () => {
+  const processMatching = async () => {
     if (!template || reports.length === 0 || keyColumns.length === 0 || targetColumns.length === 0) {
       addLog('error', 'Не все параметры заданы для обработки');
       return;
     }
 
     setIsProcessing(true);
+    setProgress(0);
     clearLogs();
     addLog('info', 'Начало обработки...');
     addLog('info', `Ключевые столбцы: ${keyColumns.join(', ')}`);
@@ -176,7 +178,10 @@ export default function App() {
     let totalFilled = 0;
     let totalNotFound = 0;
 
-    for (const report of reports) {
+    const totalReports = reports.length;
+    
+    for (let reportIndex = 0; reportIndex < reports.length; reportIndex++) {
+      const report = reports[reportIndex];
       addLog('info', `--- Обработка отчёта: "${report.name}" (${report.data.rows.length} строк) ---`);
 
       for (let i = 0; i < resultRows.length; i++) {
@@ -221,9 +226,21 @@ export default function App() {
           totalMatches++;
           totalFilled += filledCount;
         }
+
+        // Update progress every 100 rows
+        if (i % 100 === 0) {
+          const reportProgress = ((reportIndex + i / resultRows.length) / totalReports) * 100;
+          setProgress(Math.min(reportProgress, 99));
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
       }
 
       addLog('success', `Отчёт "${report.name}" обработан`);
+      
+      // Update progress after each report
+      const reportProgress = ((reportIndex + 1) / totalReports) * 100;
+      setProgress(Math.min(reportProgress, 99));
+      await new Promise(resolve => setTimeout(resolve, 0));
     }
 
     addLog('info', '=== ИТОГИ ===');
@@ -236,6 +253,7 @@ export default function App() {
       addLog('info', `Строк без совпадений в отчётах: ${totalNotFound}`);
     }
 
+    setProgress(100);
     setResultData({ headers: template.data.headers, rows: resultRows });
     setStep(4);
     setIsProcessing(false);
@@ -468,30 +486,48 @@ export default function App() {
                 )}
 
                 {/* Process button */}
-                <div className="mt-6 flex items-center gap-4">
-                  <button
-                    onClick={processMatching}
-                    disabled={
-                      keyColumns.length === 0 ||
-                      targetColumns.length === 0 ||
-                      isProcessing ||
-                      commonColumns.length === 0
-                    }
-                    className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <Play className="w-4 h-4" />
-                    {isProcessing ? 'Обработка...' : 'Выполнить сопоставление'}
-                  </button>
+                <div className="mt-6 space-y-4">
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={processMatching}
+                      disabled={
+                        keyColumns.length === 0 ||
+                        targetColumns.length === 0 ||
+                        isProcessing ||
+                        commonColumns.length === 0
+                      }
+                      className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <Play className="w-4 h-4" />
+                      {isProcessing ? 'Обработка...' : 'Выполнить сопоставление'}
+                    </button>
 
-                  {keyColumns.length === 0 && (
-                    <span className="text-xs text-gray-500">
-                      ← Выберите хотя бы один ключевой столбец
-                    </span>
-                  )}
-                  {keyColumns.length > 0 && targetColumns.length === 0 && (
-                    <span className="text-xs text-gray-500">
-                      ← Выберите хотя бы один целевой столбец
-                    </span>
+                    {keyColumns.length === 0 && (
+                      <span className="text-xs text-gray-500">
+                        ← Выберите хотя бы один ключевой столбец
+                      </span>
+                    )}
+                    {keyColumns.length > 0 && targetColumns.length === 0 && (
+                      <span className="text-xs text-gray-500">
+                        ← Выберите хотя бы один целевой столбец
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Progress bar */}
+                  {isProcessing && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600 font-medium">Обработка...</span>
+                        <span className="text-emerald-600 font-semibold">{Math.round(progress)}%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                        <div
+                          className="bg-gradient-to-r from-emerald-500 to-emerald-600 h-full rounded-full transition-all duration-300 ease-out"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                    </div>
                   )}
                 </div>
               </section>
